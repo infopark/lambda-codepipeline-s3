@@ -45,8 +45,6 @@ func HandleLambdaEvent(event events.CodePipelineEvent) error {
 	)))
 	s3Svc := s3.New(sess)
 
-	log.Println("event:", event)
-
 	userparams := event.CodePipelineJob.Data.ActionConfiguration.Configuration.UserParameters
 	if userparams == "" {
 		return cpSvc.failJob(errors.New("missing user params"))
@@ -90,7 +88,7 @@ func HandleLambdaEvent(event events.CodePipelineEvent) error {
 		return cpSvc.failJob(err)
 	}
 	tmpfile.Close()
-	log.Println("downloaded artifact. bytes:", n)
+	log.Println("downloaded artifact to temp file. bytes:", n)
 
 	zr, err := zip.OpenReader(tmpfile.Name())
 	if err != nil {
