@@ -1,9 +1,5 @@
 package main
 
-// This Lambda function unzips the input artifact to the key prefix in the bucket.
-// Configure the "Invoke / Lambda Function" action with UserParameters such as
-// {"bucket": "my-bucket", "key_prefix": "my/key/prefix"}
-
 import (
 	"archive/zip"
 	"encoding/json"
