@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -72,7 +73,10 @@ func HandleLambdaEvent(event events.CodePipelineEvent) error {
 	if err != nil {
 		return cpSvc.failJob(err)
 	}
-	defer tmpfile.Close()
+	defer func() {
+		tmpfile.Close()
+		os.Remove(tmpfile.Name())
+	}()
 
 	artiLoc := arti.Location.S3Location
 	downloader := s3manager.NewDownloaderWithClient(artiS3Svc)
