@@ -18,15 +18,19 @@ import (
 	"github.com/aws/aws-sdk-go/service/codepipeline"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/sns"
 )
 
 type params struct {
-	Bucket    string `json:"bucket"`
-	KeyPrefix string `json:"key_prefix"`
+	Bucket                  string `json:"bucket"`
+	KeyPrefix               string `json:"key_prefix"`
+	NotificationSubject     string `json:"notification_subject"`
+	NotificationSNSTopicARN string `json:"notification_sns_topic_arn"`
 }
 
 // HandleLambdaEvent is triggered by CodePipeline and copies the artifacts content to S3. It also
-// gives the copied S3 objects the bucket-owner-full-control ACL.
+// gives the copied S3 objects the bucket-owner-full-control ACL. If configured, it sends an SNS
+// notification.
 func HandleLambdaEvent(event events.CodePipelineEvent) error {
 	sess := session.Must(session.NewSession())
 
@@ -96,6 +100,7 @@ func HandleLambdaEvent(event events.CodePipelineEvent) error {
 	}
 	defer zr.Close()
 
+	var uploadedKeys []string
 	uploader := s3manager.NewUploaderWithClient(s3Svc)
 	for _, f := range zr.File {
 		log.Println("zip file file:", f.Name)
@@ -103,16 +108,35 @@ func HandleLambdaEvent(event events.CodePipelineEvent) error {
 		if err != nil {
 			return cpSvc.failJob(err)
 		}
+		key := fmt.Sprintf("%s/%s", p.KeyPrefix, f.Name)
+		uploadedKeys = append(uploadedKeys, key)
 		_, err = uploader.Upload(&s3manager.UploadInput{
 			ACL:    aws.String("bucket-owner-full-control"),
 			Body:   rc,
 			Bucket: aws.String(p.Bucket),
-			Key:    aws.String(fmt.Sprintf("%s/%s", p.KeyPrefix, f.Name)),
+			Key:    aws.String(key),
 		})
 		if err != nil {
 			return cpSvc.failJob(err)
 		}
 		rc.Close()
+	}
+
+	if p.NotificationSNSTopicARN != "" {
+		if p.NotificationSubject == "" {
+			p.NotificationSubject = "S3 copy completed"
+		}
+		msg := "CodePipeline job #" + event.CodePipelineJob.ID + " uploaded S3 keys:\n\n" +
+			strings.Join(uploadedKeys, "\n")
+		snsSvc := sns.New(sess)
+		_, err := snsSvc.Publish(&sns.PublishInput{
+			Message:  aws.String(msg),
+			Subject:  aws.String(p.NotificationSubject),
+			TopicArn: aws.String(p.NotificationSNSTopicARN),
+		})
+		if err != nil {
+			return cpSvc.failJob(err)
+		}
 	}
 
 	return cpSvc.successJob()
