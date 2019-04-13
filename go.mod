@@ -1,4 +1,4 @@
-module github.com/thomasritz/codepipeline-s3-current
+module github.com/infopark/codepipeline-s3-current
 
 go 1.12
 
