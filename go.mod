@@ -1,4 +1,4 @@
-module github.com/infopark/codepipeline-s3-current
+module github.com/infopark/lambda-codepipeline-s3
 
 go 1.12
 
